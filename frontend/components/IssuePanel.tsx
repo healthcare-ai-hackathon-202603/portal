@@ -3,12 +3,13 @@
 import { useState } from "react";
 import type { PatientIssue } from "@/lib/types";
 import { FACILITY_COLORS, FACILITY_SHORT_NAMES } from "@/lib/types";
-import { SectionHeader } from "@/components/ActionCenter";
+
 
 interface IssuePanelProps {
   issues: PatientIssue[];
   selectedIssue: string | null;
   onIssueSelect: (code: string | null) => void;
+  maxActive?: number;
 }
 
 function formatDate(dateStr: string): string {
@@ -184,9 +185,9 @@ function IssueRow({
                   Linked Medications
                 </span>
                 <div className="flex flex-wrap gap-1.5">
-                  {issue.linked_medications.map((med) => (
+                  {issue.linked_medications.map((med, idx) => (
                     <span
-                      key={med}
+                      key={`${med}-${idx}`}
                       className="badge-info text-xs px-2 py-0.5 rounded-md"
                     >
                       {med}
@@ -206,12 +207,17 @@ export default function IssuePanel({
   issues,
   selectedIssue,
   onIssueSelect,
+  maxActive,
 }: IssuePanelProps) {
+  const [showActive, setShowActive] = useState(false);
   const [showPrior, setShowPrior] = useState(false);
 
-  const activeIssues = issues
+  const allActiveIssues = issues
     .filter((i) => i.status === "active")
     .sort((a, b) => new Date(b.last_seen).getTime() - new Date(a.last_seen).getTime());
+
+  const activeIssues = maxActive ? allActiveIssues.slice(0, maxActive) : allActiveIssues;
+  const hiddenActiveCount = maxActive ? Math.max(0, allActiveIssues.length - maxActive) : 0;
 
   const priorIssues = issues
     .filter((i) => i.status === "prior")
@@ -219,22 +225,67 @@ export default function IssuePanel({
 
   return (
     <section>
-      <SectionHeader title="Active Issues" count={activeIssues.length} />
-
-      <div className="space-y-2 stagger">
-        {activeIssues.map((issue) => (
-          <IssueRow
-            key={issue.diagnosis_code}
-            issue={issue}
-            isSelected={selectedIssue === issue.diagnosis_code}
-            onSelect={() =>
-              onIssueSelect(
-                selectedIssue === issue.diagnosis_code ? null : issue.diagnosis_code
-              )
-            }
+      <button
+        onClick={() => setShowActive(!showActive)}
+        className="flex items-center gap-2 text-xs font-medium cursor-pointer mb-3 border-0 bg-transparent p-0"
+        style={{ color: "var(--text-muted)" }}
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 12 12"
+          fill="none"
+          style={{
+            transform: showActive ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "transform 0.2s ease",
+          }}
+        >
+          <path
+            d="M2.5 4.5L6 8L9.5 4.5"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
-        ))}
-      </div>
+        </svg>
+        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>
+          Active Issues
+        </span>
+        <span
+          className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full"
+          style={{
+            background: "var(--bg-surface)",
+            color: "var(--text-muted)",
+          }}
+        >
+          {allActiveIssues.length}
+        </span>
+      </button>
+
+      {showActive && (
+        <div className="space-y-2 stagger">
+          {activeIssues.map((issue) => (
+            <IssueRow
+              key={issue.diagnosis_code}
+              issue={issue}
+              isSelected={selectedIssue === issue.diagnosis_code}
+              onSelect={() =>
+                onIssueSelect(
+                  selectedIssue === issue.diagnosis_code ? null : issue.diagnosis_code
+                )
+              }
+            />
+          ))}
+          {hiddenActiveCount > 0 && (
+            <div
+              className="text-xs text-center py-2 rounded-xl cursor-default"
+              style={{ color: "var(--text-muted)", background: "var(--bg-secondary)", border: "1px solid var(--border-subtle)" }}
+            >
+              +{hiddenActiveCount} more active issue{hiddenActiveCount !== 1 ? "s" : ""}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Prior issues */}
       {priorIssues.length > 0 && (

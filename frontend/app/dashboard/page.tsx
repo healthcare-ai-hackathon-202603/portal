@@ -37,6 +37,7 @@ function DashboardContent() {
   const [loadingPatients, setLoadingPatients] = useState(true);
   const [loadingBrief, setLoadingBrief] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Load patient list
   useEffect(() => {
@@ -96,6 +97,28 @@ function DashboardContent() {
         }}
       >
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer border-0 transition-colors duration-150"
+            style={{
+              background: "var(--bg-surface)",
+              color: "var(--text-secondary)",
+            }}
+            title={sidebarOpen ? "Collapse patient list" : "Expand patient list"}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d={sidebarOpen
+                  ? "M10 3L5 8L10 13"
+                  : "M6 3L11 8L6 13"
+                }
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
           <h1
             className="text-lg font-semibold tracking-tight"
             style={{
@@ -121,9 +144,10 @@ function DashboardContent() {
       <div className="flex flex-1 min-h-0">
         {/* Sidebar */}
         <aside
-          className="w-80 shrink-0 flex flex-col"
+          className="shrink-0 flex flex-col transition-all duration-200 overflow-hidden"
           style={{
-            borderRight: "1px solid var(--border-subtle)",
+            width: sidebarOpen ? 320 : 0,
+            borderRight: sidebarOpen ? "1px solid var(--border-subtle)" : "none",
             background: "var(--bg-secondary)",
           }}
         >
