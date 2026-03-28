@@ -187,16 +187,29 @@ export default function PatientPage() {
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {labTrajectories.map((lab, i) => (
-                  <TrendChart
-                    key={i}
-                    data={lab.values}
-                    title={lab.test_name}
-                    unit={lab.unit}
-                    trend={lab.trend}
-                    referenceRangeLow={lab.reference_range_low}
-                    referenceRangeHigh={lab.reference_range_high}
-                    normalRange={`${lab.reference_range_low}${lab.unit} - ${lab.reference_range_high}${lab.unit}`}
-                  />
+                  <div key={i} className="card p-4 overflow-hidden">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h4 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{lab.test_name}</h4>
+                        <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                          Normal: {lab.reference_range_low}{lab.unit} - {lab.reference_range_high}{lab.unit}
+                        </p>
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full badge-${lab.trend === "spiking" ? "urgent" : lab.trend === "worsening" ? "warning" : lab.trend === "improving" ? "healthy" : "info"}`}>
+                        {lab.trend}
+                      </span>
+                    </div>
+                    <div style={{ height: 160, width: "100%" }}>
+                      <TrendChart
+                        data={lab.values}
+                        title={lab.test_name}
+                        unit={lab.unit}
+                        trend={lab.trend}
+                        referenceRangeLow={lab.reference_range_low}
+                        referenceRangeHigh={lab.reference_range_high}
+                      />
+                    </div>
+                  </div>
                 ))}
               </div>
             </ExpandableSection>
@@ -212,14 +225,27 @@ export default function PatientPage() {
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {vitalTrajectories.map((vital, i) => (
-                  <TrendChart
-                    key={i}
-                    data={vital.values}
-                    title={vital.vital_name}
-                    unit={vital.unit}
-                    trend={vital.trend}
-                    normalRange={vital.normal_range}
-                  />
+                  <div key={i} className="card p-4 overflow-hidden">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h4 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>{vital.vital_name}</h4>
+                        <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                          Normal: {vital.normal_range}
+                        </p>
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full badge-${vital.trend === "spiking" ? "urgent" : vital.trend === "worsening" ? "warning" : vital.trend === "improving" ? "healthy" : "info"}`}>
+                        {vital.trend}
+                      </span>
+                    </div>
+                    <div style={{ height: 160, width: "100%" }}>
+                      <TrendChart
+                        data={vital.values}
+                        title={vital.vital_name}
+                        unit={vital.unit}
+                        trend={vital.trend}
+                      />
+                    </div>
+                  </div>
                 ))}
               </div>
             </ExpandableSection>
