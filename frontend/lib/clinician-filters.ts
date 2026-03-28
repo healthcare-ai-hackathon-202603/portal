@@ -64,19 +64,6 @@ export function getDrugClassesForCondition(diagnosisCode: string): string[] {
   return CONDITION_DRUG_CLASSES[diagnosisCode] ?? [];
 }
 
-export interface MedicationRow {
-  name: string;
-  dosage: string;
-  frequency: string;
-  active: boolean;
-  end_date?: string;
-  prescriber: string;
-  start_date: string;
-  route: string;
-  drug_code: string;
-  facility?: string;
-}
-
 export function filterLabsByIssue(
   labs: LabTrajectory[],
   issueCode: string | null
@@ -87,10 +74,10 @@ export function filterLabsByIssue(
   return labs.filter((l) => relevant.includes(l.test_name));
 }
 
-export function filterMedsByIssue(
-  meds: MedicationRow[],
+export function filterMedsByIssue<T extends { name: string }>(
+  meds: T[],
   issueCode: string | null
-): MedicationRow[] {
+): T[] {
   if (!issueCode) return meds;
   const classes = getDrugClassesForCondition(issueCode);
   if (classes.length === 0) return meds;

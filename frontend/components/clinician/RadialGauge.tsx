@@ -45,6 +45,7 @@ function describeArc(startAngle: number, endAngle: number): string {
 }
 
 function valueToAngle(value: number, min: number, max: number): number {
+  if (max === min) return START_ANGLE + SWEEP / 2;
   const clamped = Math.max(min, Math.min(max, value));
   const ratio = (clamped - min) / (max - min);
   return START_ANGLE + ratio * SWEEP;

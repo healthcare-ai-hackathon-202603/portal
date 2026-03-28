@@ -65,6 +65,11 @@ export default function ClinicianPanel({
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [detailTest, setDetailTest] = useState<string | null>(null);
 
+  function handleIssueSelect(code: string | null) {
+    setSelectedIssue(code);
+    setDetailTest(null);
+  }
+
   // Transform medications response to MedRow[]
   const medRows: MedRow[] = useMemo(() => {
     return medications.medications.map((m: Record<string, unknown>) => ({
@@ -109,7 +114,7 @@ export default function ClinicianPanel({
     <div className="space-y-6 animate-fade-in">
       {/* Sticky Demographics Header */}
       <div
-        className="sticky top-0 z-10 flex items-center gap-4 px-1 py-3"
+        className="sticky top-0 z-10 flex items-center gap-4 px-1 py-2 max-h-12"
         style={{ background: "var(--bg-primary)" }}
       >
         <h2
@@ -154,7 +159,7 @@ export default function ClinicianPanel({
           careGaps={brief.care_gaps}
           labs={brief.lab_trajectories}
           selectedIssue={selectedIssue}
-          onSelect={setSelectedIssue}
+          onSelect={handleIssueSelect}
         />
       </div>
 

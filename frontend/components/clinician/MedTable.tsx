@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import type { MedicationAlerts } from "@/lib/types";
-import { getDrugClass } from "@/lib/clinician-filters";
-
 export interface MedRow {
   name: string;
   dosage: string;
@@ -97,13 +95,14 @@ export default function MedTable({ medications, alerts }: MedTableProps) {
 
   function renderRow(med: MedRow) {
     const days = daysUntil(med.end_date);
-    const isExpanded = expandedMed === med.name;
+    const medKey = `${med.name}-${med.start_date}-${med.drug_code}`;
+    const isExpanded = expandedMed === medKey;
     const badges = getAlertBadges(med.name, alerts);
 
     return (
-      <div key={med.name}>
+      <div key={medKey}>
         <button
-          onClick={() => setExpandedMed(isExpanded ? null : med.name)}
+          onClick={() => setExpandedMed(isExpanded ? null : medKey)}
           className="w-full text-left px-4 py-3 flex items-center gap-4 transition-colors duration-150 cursor-pointer border-0"
           style={{
             background: isExpanded ? "var(--bg-elevated)" : "transparent",
