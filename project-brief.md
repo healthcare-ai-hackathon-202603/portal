@@ -38,12 +38,23 @@ An always-available conversational interface for navigating and managing healthc
       
 ## Layout
 ### Clinician View
-Radial Gauge for summarizing test data states
-- The Arc (The Track): Represents the minimum and maximum scale. The "active" portion of the arc usually changes color (e.g., green to red) to provide instant context on whether the value is "good" or "bad."
-
-- The Center Value: The "Hero" number or the latest test result point.
-
-- The Trend Label: Positioned at the bottom, this provides temporal context (e.g., "+12% from last month" or "Increasing") to explain the direction of the data.
+- Left section is a list of patient under the doctors care, order by urgency of attention (triage level, date last encounter, test or next action).  Selecting a specific patient, brings their current state into focus for the UI
+- Right panel 
+    - Patient info (name, age, sex, blood type, language,) is sticky at top
+    - Active issues
+        - selecting an issue focuses the section on that issue (i.e.
+            - filters meds and test results, 
+            - expands detailed med and test result info
+            - brings up complaints)
+    - Medictions 
+        - Summary view: name, dose, renewal
+        - Detailed: as is
+    - Test Results
+        - Summary: radial gauge
+            - The Arc (The Track): Represents the minimum and maximum scale. The "active" portion of the arc usually changes color (e.g., green to red) to provide instant context on whether the value is "good" or "bad."
+            - The Center Value: The "Hero" number or the latest test result point.
+            - The Trend Label: Positioned at the bottom, this provides temporal context (e.g., "+12% from last month" or "Increasing") to explain the direction of the data.
+        - D
 
 ### Patient View
 Left section shows a list of current active issues for the patient in order of urgency or severity.  There is a visual cue to expand prior issues below the current issues.  Selecting an issue will shift the UI focus to that issue.
