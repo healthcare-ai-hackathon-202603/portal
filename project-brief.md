@@ -37,6 +37,13 @@ An always-available conversational interface for navigating and managing healthc
 
       
 ## Layout
+### Clinician View
+Radial Gauge for summarizing test data states
+- The Arc (The Track): Represents the minimum and maximum scale. The "active" portion of the arc usually changes color (e.g., green to red) to provide instant context on whether the value is "good" or "bad."
+
+- The Center Value: The "Hero" number or the latest test result point.
+
+- The Trend Label: Positioned at the bottom, this provides temporal context (e.g., "+12% from last month" or "Increasing") to explain the direction of the data.
 
 ### Patient View
 Left section shows a list of current active issues for the patient in order of urgency or severity.  There is a visual cue to expand prior issues below the current issues.  Selecting an issue will shift the UI focus to that issue.
