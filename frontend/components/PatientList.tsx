@@ -212,7 +212,7 @@ export default function PatientList({
                         className="text-[10px] mt-0.5 truncate"
                         style={{ color: URGENCY_DOT_COLOR[urgency.level] }}
                       >
-                        {urgency.label}
+                        {urgency.reasons?.[0] ?? urgency.label}
                       </div>
                     )}
                   </div>
