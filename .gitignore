@@ -1,6 +1,6 @@
 __pycache__/
 *.pyc
-.next/
+.next/*
 node_modules/
 .DS_Store
 *.db
