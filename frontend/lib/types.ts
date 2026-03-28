@@ -166,6 +166,40 @@ export interface MedicationsResponse {
   alerts: MedicationAlerts;
 }
 
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ChatResponse {
+  response: string;
+  suggested_questions: string[];
+  relevant_metrics: string[];
+}
+
+export interface RiskScore {
+  score: number;
+  level: "good" | "watch" | "at-risk";
+  factors: string[];
+}
+
+export interface PatientIssue {
+  diagnosis_code: string;
+  diagnosis_description: string;
+  encounter_count: number;
+  first_seen: string;
+  last_seen: string;
+  facilities: string[];
+  linked_medications: string[];
+  status: "active" | "prior";
+}
+
+export interface UrgencyClassification {
+  level: "red" | "yellow" | "green";
+  label: string;
+  reasons: string[];
+}
+
 // Facility color mapping
 export const FACILITY_COLORS: Record<string, string> = {
   "Royal Jubilee Hospital": "#3B82F6",

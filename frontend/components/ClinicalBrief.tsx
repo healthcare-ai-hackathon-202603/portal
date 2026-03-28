@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import type {
   SessionDelta,
   LabTrajectory,
@@ -9,8 +10,11 @@ import type {
   ExpiringMedication,
   CrossFacilityMed,
   Encounter,
+  PatientIssue,
+  CareGap,
 } from "@/lib/types";
 import { FACILITY_COLORS, FACILITY_SHORT_NAMES } from "@/lib/types";
+import { getPatientIssues } from "@/lib/api";
 import TrendChart from "@/components/TrendChart";
 import CareGapCard from "@/components/CareGapCard";
 
@@ -407,74 +411,381 @@ function EncounterRow({ enc }: { enc: Encounter }) {
   );
 }
 
-/* ── Main Component ──────────────────────────────────── */
+/* ── Diagnosis → Lab Metric Mapping ─────────────────── */
 
-interface ClinicalBriefProps {
-  brief: SessionDelta;
-}
+const DIAGNOSIS_METRICS: Record<string, string[]> = {
+  "E11.9": ["HbA1c", "Fasting Glucose", "Creatinine"],
+  "I10": ["Systolic BP", "Diastolic BP", "Creatinine", "Potassium"],
+  "F32.9": [],
+  "E78.5": ["Total Cholesterol", "LDL", "HDL"],
+  "E03.9": ["TSH"],
+  "N18.3": ["Creatinine", "Potassium", "Sodium"],
+  "J45.20": ["O2 Saturation"],
+};
 
-export default function ClinicalBrief({ brief }: ClinicalBriefProps) {
-  const { patient, medication_alerts, care_gaps, recent_encounters } = brief;
+/* ── Issue Card (collapsible) ───────────────────────── */
 
-  // Filter and sort lab trajectories: non-stable, spiking first
-  const labTrajectories = [...brief.lab_trajectories]
-    .filter((l) => l.trend !== "stable")
-    .sort((a, b) => (trendOrder[a.trend] ?? 3) - (trendOrder[b.trend] ?? 3));
+function IssueCard({
+  issue,
+  defaultExpanded,
+  labTrajectories,
+  encounters,
+  careGaps,
+}: {
+  issue: PatientIssue;
+  defaultExpanded: boolean;
+  labTrajectories: LabTrajectory[];
+  encounters: Encounter[];
+  careGaps: CareGap[];
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
-  // Filter and sort vital trajectories similarly
-  const vitalTrajectories = [...brief.vital_trajectories]
-    .filter((v) => v.trend !== "stable")
-    .sort((a, b) => (trendOrder[a.trend] ?? 3) - (trendOrder[b.trend] ?? 3));
-
-  // Sort care gaps: urgent first
-  const sortedGaps = [...care_gaps].sort((a, b) =>
-    a.severity === "urgent" && b.severity !== "urgent" ? -1 : b.severity === "urgent" && a.severity !== "urgent" ? 1 : 0
+  const relatedMetrics = DIAGNOSIS_METRICS[issue.diagnosis_code] ?? [];
+  const relatedLabs = labTrajectories.filter((l) =>
+    relatedMetrics.includes(l.test_name)
+  );
+  const relatedEncounters = encounters.filter(
+    (e) => e.diagnosis_code === issue.diagnosis_code
+  );
+  const relatedGaps = careGaps.filter(
+    (g) => g.diagnosis_code === issue.diagnosis_code
   );
 
-  const last10Encounters = recent_encounters.slice(0, 10);
-
-  const hasMedAlerts =
-    medication_alerts.duplications.length > 0 ||
-    medication_alerts.temporal_correlations.length > 0 ||
-    medication_alerts.expiring.length > 0 ||
-    medication_alerts.cross_facility.length > 0;
+  const hasContent =
+    issue.linked_medications.length > 0 ||
+    relatedLabs.length > 0 ||
+    relatedEncounters.length > 0 ||
+    relatedGaps.length > 0;
 
   return (
-    <div className="space-y-8 animate-fade-in max-w-[1200px]">
-      {/* Patient Header */}
-      <div className="card-elevated p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1
-              className="text-2xl font-semibold"
+    <div className="card overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full text-left p-5 flex items-center justify-between cursor-pointer border-0"
+        style={{ background: "transparent" }}
+      >
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4
+              className="text-sm font-semibold"
+              style={{ color: "var(--text-primary)" }}
+            >
+              {issue.diagnosis_description}
+            </h4>
+            <span
+              className="font-mono text-xs"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {issue.diagnosis_code}
+            </span>
+            <span
+              className="text-[10px] font-mono px-1.5 py-0.5 rounded"
               style={{
-                fontFamily: "var(--font-display)",
-                color: "var(--text-primary)",
+                background: "var(--bg-surface)",
+                color: "var(--text-secondary)",
               }}
             >
-              {patient.last_name}, {patient.first_name}
-            </h1>
-            <div
-              className="flex items-center gap-4 mt-1 text-sm"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              <span>{patient.age}y {patient.sex}</span>
-              <span className="font-mono text-xs" style={{ color: "var(--text-muted)" }}>
-                DOB {formatDate(patient.date_of_birth)}
-              </span>
-              <span>Blood: {patient.blood_type}</span>
-              <span>Lang: {patient.primary_language}</span>
-              <span
-                className="font-mono text-xs"
-                style={{ color: "var(--text-accent)" }}
-              >
-                {patient.patient_id}
-              </span>
-            </div>
+              {issue.encounter_count} enc
+            </span>
+          </div>
+          <div
+            className="flex items-center gap-3 mt-1 text-xs"
+            style={{ color: "var(--text-muted)" }}
+          >
+            <span>First seen: {formatDate(issue.first_seen)}</span>
+            <span>Last seen: {formatDate(issue.last_seen)}</span>
+            <span>{issue.facilities.length} facilities</span>
           </div>
         </div>
-      </div>
+        <span
+          className="text-sm shrink-0 ml-3 transition-transform duration-200"
+          style={{
+            color: "var(--text-muted)",
+            transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+          }}
+        >
+          &#9660;
+        </span>
+      </button>
 
+      {expanded && hasContent && (
+        <div
+          className="px-5 pb-5 space-y-4 animate-fade-in"
+          style={{ borderTop: "1px solid var(--border-subtle)" }}
+        >
+          {/* Linked Medications */}
+          {issue.linked_medications.length > 0 && (
+            <div className="pt-4">
+              <h5
+                className="text-[11px] font-semibold uppercase tracking-widest mb-2"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Linked Medications
+              </h5>
+              <div className="flex flex-wrap gap-2">
+                {issue.linked_medications.map((med) => (
+                  <span
+                    key={med}
+                    className="text-xs font-mono px-2 py-1 rounded"
+                    style={{
+                      background: "var(--bg-surface)",
+                      color: "var(--text-secondary)",
+                      border: "1px solid var(--border-subtle)",
+                    }}
+                  >
+                    {med}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Related Lab Trajectories */}
+          {relatedLabs.length > 0 && (
+            <div>
+              <h5
+                className="text-[11px] font-semibold uppercase tracking-widest mb-2"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Related Labs
+              </h5>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {relatedLabs.map((lab) => (
+                  <LabTrajectoryCard key={lab.test_code} lab={lab} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Related Care Gaps */}
+          {relatedGaps.length > 0 && (
+            <div>
+              <h5
+                className="text-[11px] font-semibold uppercase tracking-widest mb-2"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Care Gaps
+              </h5>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {relatedGaps.map((gap) => (
+                  <CareGapCard
+                    key={`issue-${gap.diagnosis_code}-${gap.required_test}`}
+                    gap={gap}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Related Encounters */}
+          {relatedEncounters.length > 0 && (
+            <div>
+              <h5
+                className="text-[11px] font-semibold uppercase tracking-widest mb-2"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Related Encounters ({relatedEncounters.length})
+              </h5>
+              <div className="space-y-1">
+                {relatedEncounters.slice(0, 5).map((enc) => {
+                  const color = FACILITY_COLORS[enc.facility] ?? "var(--text-muted)";
+                  const shortFacility = FACILITY_SHORT_NAMES[enc.facility] ?? enc.facility;
+                  return (
+                    <div
+                      key={enc.encounter_id}
+                      className="flex items-center gap-3 py-1.5 px-2 rounded"
+                      style={{ background: "var(--bg-surface)" }}
+                    >
+                      <span
+                        className="text-xs font-mono"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        {formatDate(enc.encounter_date)}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className="facility-dot" style={{ backgroundColor: color }} />
+                        <span className="text-xs" style={{ color }}>
+                          {shortFacility}
+                        </span>
+                      </div>
+                      <span
+                        className="text-xs truncate"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        {enc.chief_complaint}
+                      </span>
+                      <span
+                        className="text-[10px] uppercase tracking-wide ml-auto shrink-0"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        {enc.disposition}
+                      </span>
+                    </div>
+                  );
+                })}
+                {relatedEncounters.length > 5 && (
+                  <div
+                    className="text-xs pt-1"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    + {relatedEncounters.length - 5} more encounters
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {expanded && !hasContent && (
+        <div
+          className="px-5 pb-5 pt-3 text-xs"
+          style={{
+            color: "var(--text-muted)",
+            borderTop: "1px solid var(--border-subtle)",
+          }}
+        >
+          No linked data found for this issue.
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Issue-Driven View ──────────────────────────────── */
+
+function IssueView({
+  issues,
+  loading,
+  labTrajectories,
+  encounters,
+  careGaps,
+}: {
+  issues: PatientIssue[];
+  loading: boolean;
+  labTrajectories: LabTrajectory[];
+  encounters: Encounter[];
+  careGaps: CareGap[];
+}) {
+  const [showPrior, setShowPrior] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-32">
+        <span
+          className="text-sm animate-pulse-soft"
+          style={{ color: "var(--text-muted)" }}
+        >
+          Loading patient issues...
+        </span>
+      </div>
+    );
+  }
+
+  const activeIssues = issues.filter((i) => i.status === "active");
+  const priorIssues = issues.filter((i) => i.status === "prior");
+
+  if (activeIssues.length === 0 && priorIssues.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-32">
+        <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+          No issues found for this patient.
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Active Issues */}
+      {activeIssues.length > 0 && (
+        <section>
+          <SectionHeading title="Active Issues" count={activeIssues.length} />
+          <div className="space-y-3 stagger">
+            {activeIssues.map((issue, idx) => (
+              <IssueCard
+                key={`${issue.diagnosis_code}-${issue.first_seen}`}
+                issue={issue}
+                defaultExpanded={idx < 3}
+                labTrajectories={labTrajectories}
+                encounters={encounters}
+                careGaps={careGaps}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Prior Issues */}
+      {priorIssues.length > 0 && (
+        <section>
+          <button
+            onClick={() => setShowPrior(!showPrior)}
+            className="flex items-center gap-2 mb-3 cursor-pointer border-0 bg-transparent p-0"
+          >
+            <h3
+              className="text-xs font-semibold uppercase tracking-widest flex items-center gap-2"
+              style={{ color: "var(--text-muted)" }}
+            >
+              Prior Issues
+              <span
+                className="text-[10px] font-mono px-1.5 py-0.5 rounded"
+                style={{
+                  background: "var(--bg-surface)",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                {priorIssues.length}
+              </span>
+              <span
+                className="text-sm transition-transform duration-200"
+                style={{
+                  transform: showPrior ? "rotate(180deg)" : "rotate(0deg)",
+                }}
+              >
+                &#9660;
+              </span>
+            </h3>
+          </button>
+          {showPrior && (
+            <div className="space-y-3 stagger">
+              {priorIssues.map((issue) => (
+                <IssueCard
+                  key={`prior-${issue.diagnosis_code}-${issue.first_seen}`}
+                  issue={issue}
+                  defaultExpanded={false}
+                  labTrajectories={labTrajectories}
+                  encounters={encounters}
+                  careGaps={careGaps}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+    </div>
+  );
+}
+
+/* ── Category View (original layout) ────────────────── */
+
+function CategoryView({
+  labTrajectories,
+  vitalTrajectories,
+  medication_alerts,
+  sortedGaps,
+  last10Encounters,
+  hasMedAlerts,
+}: {
+  labTrajectories: LabTrajectory[];
+  vitalTrajectories: VitalTrajectory[];
+  medication_alerts: SessionDelta["medication_alerts"];
+  sortedGaps: CareGap[];
+  last10Encounters: Encounter[];
+  hasMedAlerts: boolean;
+}) {
+  return (
+    <>
       {/* Lab Trajectories */}
       {labTrajectories.length > 0 && (
         <section>
@@ -630,6 +941,152 @@ export default function ClinicalBrief({ brief }: ClinicalBriefProps) {
             </table>
           </div>
         </section>
+      )}
+    </>
+  );
+}
+
+/* ── Main Component ──────────────────────────────────── */
+
+interface ClinicalBriefProps {
+  brief: SessionDelta;
+}
+
+export default function ClinicalBrief({ brief }: ClinicalBriefProps) {
+  const { patient, medication_alerts, care_gaps, recent_encounters } = brief;
+
+  const [viewMode, setViewMode] = useState<"category" | "issue">("category");
+  const [issues, setIssues] = useState<PatientIssue[]>([]);
+  const [loadingIssues, setLoadingIssues] = useState(false);
+  const [issuesFetched, setIssuesFetched] = useState<string | null>(null);
+
+  // Fetch issues when switching to issue view (lazy load)
+  useEffect(() => {
+    if (viewMode !== "issue") return;
+    if (issuesFetched === patient.patient_id) return;
+
+    setLoadingIssues(true);
+    getPatientIssues(patient.patient_id)
+      .then((data) => {
+        setIssues(data);
+        setIssuesFetched(patient.patient_id);
+        setLoadingIssues(false);
+      })
+      .catch(() => {
+        setIssues([]);
+        setIssuesFetched(patient.patient_id);
+        setLoadingIssues(false);
+      });
+  }, [viewMode, patient.patient_id, issuesFetched]);
+
+  // Reset issues when patient changes
+  useEffect(() => {
+    if (issuesFetched && issuesFetched !== patient.patient_id) {
+      setIssues([]);
+      setIssuesFetched(null);
+    }
+  }, [patient.patient_id, issuesFetched]);
+
+  // Filter and sort lab trajectories: non-stable, spiking first
+  const labTrajectories = [...brief.lab_trajectories]
+    .filter((l) => l.trend !== "stable")
+    .sort((a, b) => (trendOrder[a.trend] ?? 3) - (trendOrder[b.trend] ?? 3));
+
+  // All lab trajectories (including stable) for issue view
+  const allLabTrajectories = [...brief.lab_trajectories].sort(
+    (a, b) => (trendOrder[a.trend] ?? 3) - (trendOrder[b.trend] ?? 3)
+  );
+
+  // Filter and sort vital trajectories similarly
+  const vitalTrajectories = [...brief.vital_trajectories]
+    .filter((v) => v.trend !== "stable")
+    .sort((a, b) => (trendOrder[a.trend] ?? 3) - (trendOrder[b.trend] ?? 3));
+
+  // Sort care gaps: urgent first
+  const sortedGaps = [...care_gaps].sort((a, b) =>
+    a.severity === "urgent" && b.severity !== "urgent" ? -1 : b.severity === "urgent" && a.severity !== "urgent" ? 1 : 0
+  );
+
+  const last10Encounters = recent_encounters.slice(0, 10);
+
+  const hasMedAlerts =
+    medication_alerts.duplications.length > 0 ||
+    medication_alerts.temporal_correlations.length > 0 ||
+    medication_alerts.expiring.length > 0 ||
+    medication_alerts.cross_facility.length > 0;
+
+  return (
+    <div className="space-y-8 animate-fade-in max-w-[1200px]">
+      {/* Patient Header */}
+      <div className="card-elevated p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1
+              className="text-2xl font-semibold"
+              style={{
+                fontFamily: "var(--font-display)",
+                color: "var(--text-primary)",
+              }}
+            >
+              {patient.last_name}, {patient.first_name}
+            </h1>
+            <div
+              className="flex items-center gap-4 mt-1 text-sm"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              <span>{patient.age}y {patient.sex}</span>
+              <span className="font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+                DOB {formatDate(patient.date_of_birth)}
+              </span>
+              <span>Blood: {patient.blood_type}</span>
+              <span>Lang: {patient.primary_language}</span>
+              <span
+                className="font-mono text-xs"
+                style={{ color: "var(--text-accent)" }}
+              >
+                {patient.patient_id}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* View Toggle */}
+      <div className="flex items-center justify-between">
+        <div className="view-toggle">
+          <button
+            className={`view-toggle-btn ${viewMode === "category" ? "active" : ""}`}
+            onClick={() => setViewMode("category")}
+          >
+            By Category
+          </button>
+          <button
+            className={`view-toggle-btn ${viewMode === "issue" ? "active" : ""}`}
+            onClick={() => setViewMode("issue")}
+          >
+            By Issue
+          </button>
+        </div>
+      </div>
+
+      {/* Content based on view mode */}
+      {viewMode === "category" ? (
+        <CategoryView
+          labTrajectories={labTrajectories}
+          vitalTrajectories={vitalTrajectories}
+          medication_alerts={medication_alerts}
+          sortedGaps={sortedGaps}
+          last10Encounters={last10Encounters}
+          hasMedAlerts={hasMedAlerts}
+        />
+      ) : (
+        <IssueView
+          issues={issues}
+          loading={loadingIssues}
+          labTrajectories={allLabTrajectories}
+          encounters={recent_encounters}
+          careGaps={care_gaps}
+        />
       )}
     </div>
   );

@@ -195,3 +195,82 @@ class PatientSummary(BaseModel):
     alerts: list[AlertItem]
     active_medications: list[dict]
     recent_encounters: list[Encounter]
+
+
+# --- Chat models ---
+
+class ChatMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+
+class ChatRequest(BaseModel):
+    message: str
+    conversation_history: list[ChatMessage] = []
+
+
+class ChatResponse(BaseModel):
+    response: str
+    suggested_questions: list[str] = []
+    relevant_metrics: list[str] = []
+
+
+# --- Risk, Issues, Urgency models ---
+
+class RiskScore(BaseModel):
+    score: int
+    level: str  # "good", "watch", "at-risk"
+    factors: list[str]
+
+
+class PatientIssue(BaseModel):
+    diagnosis_code: str
+    diagnosis_description: str
+    encounter_count: int
+    first_seen: str
+    last_seen: str
+    facilities: list[str]
+    linked_medications: list[str]
+    status: str  # "active" or "prior"
+
+
+class UrgencyClassification(BaseModel):
+    level: str  # "red", "yellow", "green"
+    label: str
+    reasons: list[str]
+
+
+# --- Agent models ---
+
+class TriageResult(BaseModel):
+    urgency: str  # "emergency", "urgent", "semi-urgent", "routine"
+    reasoning: str
+    recommended_action: str
+    recommended_care_level: str
+
+
+class ProviderInfo(BaseModel):
+    name: str
+    type: str
+    address: str
+    phone: str
+    wait_time_mins: int | None = None
+    specialty: str | None = None
+
+
+class ProviderRouting(BaseModel):
+    recommended_providers: list[ProviderInfo]
+    care_level: str
+    reasoning: str
+
+
+class MetricRelevance(BaseModel):
+    metrics: list[str]
+    source: str  # "symptom", "diagnosis", "chat"
+
+
+class ReferralCheck(BaseModel):
+    referral_needed: bool
+    specialist_type: str | None = None
+    requires_gp_referral: bool = False
+    reason: str

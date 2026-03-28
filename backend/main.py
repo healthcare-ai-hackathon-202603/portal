@@ -17,15 +17,27 @@ from .data_loader import (
     get_vitals,
     load_all_data,
 )
+from pydantic import BaseModel as _BaseModel
+
 from .models import (
+    ChatRequest,
+    ChatResponse,
     Encounter,
     LabTrajectory,
     MedicationAlerts,
+    MetricRelevance,
     Patient,
+    PatientIssue,
     PatientListItem,
     PatientSummary,
+    ProviderRouting,
+    ReferralCheck,
+    RiskScore,
     SessionDelta,
+    TriageResult,
+    UrgencyClassification,
 )
+from .chat import handle_patient_chat
 from .session_delta import (
     compute_full_delta,
     compute_lab_trajectories,
@@ -33,7 +45,10 @@ from .session_delta import (
     detect_care_gaps,
     detect_medication_alerts,
 )
+from .issues import compute_patient_issues
+from .risk_score import compute_risk_score
 from .templates import generate_patient_summary, render_medication_for_patient
+from .urgency import classify_urgency
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +194,34 @@ async def get_patient_medications(patient_id: str, lang: str = Query(default="en
         "medications": medications,
         "alerts": alerts,
     }
+
+
+@app.get("/api/patients/{patient_id}/risk-score", response_model=RiskScore)
+async def get_patient_risk_score(patient_id: str):
+    """Compute a risk score for a patient."""
+    _require_patient(patient_id)
+    return compute_risk_score(patient_id)
+
+
+@app.get("/api/patients/{patient_id}/issues", response_model=list[PatientIssue])
+async def get_patient_issues(patient_id: str):
+    """Return diagnosis-driven issues grouped from encounter history."""
+    _require_patient(patient_id)
+    return compute_patient_issues(patient_id)
+
+
+@app.get("/api/patients/{patient_id}/urgency", response_model=UrgencyClassification)
+async def get_patient_urgency(patient_id: str):
+    """Classify per-patient urgency: red / yellow / green."""
+    _require_patient(patient_id)
+    return classify_urgency(patient_id)
+
+
+@app.post("/api/patients/{patient_id}/chat", response_model=ChatResponse)
+async def chat_with_patient(patient_id: str, request: ChatRequest):
+    """Patient-facing AI health assistant chat."""
+    _require_patient(patient_id)
+    return handle_patient_chat(patient_id, request)
 
 
 # ---------------------------------------------------------------------------

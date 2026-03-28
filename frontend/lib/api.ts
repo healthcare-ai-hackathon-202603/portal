@@ -17,6 +17,11 @@ import type {
   LabTrajectory,
   VitalTrajectory,
   MedicationsResponse,
+  ChatMessage,
+  ChatResponse,
+  RiskScore,
+  PatientIssue,
+  UrgencyClassification,
 } from "./types";
 
 export async function getPatients(): Promise<PatientListItem[]> {
@@ -56,4 +61,32 @@ export async function getVitalTrajectories(
 
 export async function getMedications(id: string): Promise<MedicationsResponse> {
   return fetchAPI<MedicationsResponse>(`/api/patients/${id}/medications`);
+}
+
+export async function sendChatMessage(
+  patientId: string,
+  message: string,
+  history: ChatMessage[]
+): Promise<ChatResponse> {
+  const res = await fetch(`${API_BASE}/api/patients/${patientId}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, conversation_history: history }),
+  });
+  if (!res.ok) {
+    throw new Error(`Chat error: ${res.status} ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function getRiskScore(id: string): Promise<RiskScore> {
+  return fetchAPI<RiskScore>(`/api/patients/${id}/risk-score`);
+}
+
+export async function getPatientIssues(id: string): Promise<PatientIssue[]> {
+  return fetchAPI<PatientIssue[]>(`/api/patients/${id}/issues`);
+}
+
+export async function getUrgency(id: string): Promise<UrgencyClassification> {
+  return fetchAPI<UrgencyClassification>(`/api/patients/${id}/urgency`);
 }
