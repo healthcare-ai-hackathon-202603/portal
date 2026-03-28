@@ -2,21 +2,38 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { getPatients, getClinicalBrief } from "@/lib/api";
-import type { PatientListItem, SessionDelta } from "@/lib/types";
+import {
+  getPatients,
+  getClinicalBrief,
+  getPatient,
+  getPatientIssues,
+  getMedications,
+} from "@/lib/api";
+import type {
+  PatientListItem,
+  SessionDelta,
+  Patient,
+  PatientIssue,
+  MedicationsResponse,
+} from "@/lib/types";
 import PatientList from "@/components/PatientList";
-import ClinicalBrief from "@/components/ClinicalBrief";
+import ClinicianPanel from "@/components/clinician/ClinicianPanel";
 import ViewToggle from "@/components/ViewToggle";
+
+interface PatientData {
+  patient: Patient;
+  brief: SessionDelta;
+  issues: PatientIssue[];
+  medications: MedicationsResponse;
+}
 
 function DashboardContent() {
   const searchParams = useSearchParams();
   const preselected = searchParams.get("patient");
 
   const [patients, setPatients] = useState<PatientListItem[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(
-    preselected
-  );
-  const [brief, setBrief] = useState<SessionDelta | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(preselected);
+  const [patientData, setPatientData] = useState<PatientData | null>(null);
   const [loadingPatients, setLoadingPatients] = useState(true);
   const [loadingBrief, setLoadingBrief] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,17 +52,23 @@ function DashboardContent() {
       });
   }, []);
 
-  // Load clinical brief when patient selected
+  // Load all patient data when selected
   useEffect(() => {
     if (!selectedId) {
-      setBrief(null);
+      setPatientData(null);
       return;
     }
     setLoadingBrief(true);
     setError(null);
-    getClinicalBrief(selectedId)
-      .then((data) => {
-        setBrief(data);
+
+    Promise.all([
+      getPatient(selectedId),
+      getClinicalBrief(selectedId),
+      getPatientIssues(selectedId),
+      getMedications(selectedId),
+    ])
+      .then(([patient, brief, issues, medications]) => {
+        setPatientData({ patient, brief, issues, medications });
         setLoadingBrief(false);
       })
       .catch((err) => {
@@ -56,12 +79,14 @@ function DashboardContent() {
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId(id);
-    // Update URL without navigation
     window.history.replaceState(null, "", `/dashboard?patient=${id}`);
   }, []);
 
   return (
-    <div className="h-screen flex flex-col" style={{ background: "var(--bg-primary)" }}>
+    <div
+      className="h-screen flex flex-col"
+      style={{ background: "var(--bg-primary)" }}
+    >
       {/* Header */}
       <header
         className="flex items-center justify-between px-6 py-3 shrink-0"
@@ -174,7 +199,14 @@ function DashboardContent() {
             </div>
           )}
 
-          {brief && !loadingBrief && <ClinicalBrief brief={brief} />}
+          {patientData && !loadingBrief && (
+            <ClinicianPanel
+              patient={patientData.patient}
+              brief={patientData.brief}
+              issues={patientData.issues}
+              medications={patientData.medications}
+            />
+          )}
         </main>
       </div>
     </div>
