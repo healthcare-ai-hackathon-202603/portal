@@ -34,6 +34,29 @@ An always-available conversational interface for navigating and managing healthc
 - The chat is context-aware, reflecting whatever the patient is currently focused on — whether a specific action, event, or the home view.
 - The chat proactively and transparently prompts the patient before sharing any information with the healthcare system or storing it locally, maintaining clear boundaries around data and consent.
 
+
+      
+## Layout
+
+### Patient View
+Left section shows a list of current active issues for the patient in order of urgency or severity.  There is a visual cue to expand prior issues below the current issues.  Selecting an issue will shift the UI focus to that issue.
+#### Issues
+The issue summary view will show the diagnosis and key information related to the issue: medications, symptoms to track, tests results, next appt
+
+The expanded view will expand detail of each of the summary metrics.
+#### Actions
+#### Calendar
+#### Chat
+
+
+## Decision
+### Triage Recommendation
+Based on symptoms and history the agent will prioritize steering the patient to appropriate practioner first, urgent care (walk-in) clinic next, or emergency service only when necessary,
+Based on the patient complaint, history and availability within their circle of care, the agent will assess the most appropriate, available resource to address the need in a timely manner and prompt the user for follow up action (agent books appt, patient goes to walk-in or er)
+
+
+
+
 ## 2. Core Feature Set
 *   **Health Progress Dashboard:** Time-series visualization of vitals (BP, Heart Rate) and lab trends (HbA1c, Cholesterol) with interpretation of abnormal flags.
 *   **Proactive Action Center:** Automated "to-do" lists for medication renewals (based on `active` status and `end_date`) and clinical follow-ups.
