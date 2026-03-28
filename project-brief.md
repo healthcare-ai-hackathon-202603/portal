@@ -1,7 +1,38 @@
 # Project Brief: HealthSync — AI-Powered FHIR Patient Companion
 
 ## 1. Project Objective
-To build a FHIR-native patient portal that transforms raw clinical data into a proactive health management tool. The platform will provide patients with a longitudinal view of their progress, medication safety alerts, and an intelligent chat interface powered by the UVic Healthcare AI dataset.
+This product is the patient's primary point of contact with their healthcare community. Its purpose is to accelerate access to the most appropriate care — people, information, and services — while fostering communication and building trust between patients and their circle of healthcare providers.
+The product is designed to reduce the cognitive load of managing one's health and navigating the healthcare system, for both patients and care teams.
+Patient needs can be broadly grouped into three modes:
+
+**Symptom resolution** — "I have symptoms. What should I do, and can I stop worrying?" The patient wants a clear, reassuring path to the right care without having to figure out the system themselves.
+**Ongoing management** — "I'm managing a health condition. Help me stay on top of appointments, prescriptions, activities, symptoms, and tests without letting it take over my life."
+**Proactive wellness** — "I want to protect my health. Keep me focused on evidence-based habits and preventive care."
+
+## Human-Centered UX Design
+The interface is built on the principle of progressive disclosure — information surfaces only when it's relevant, keeping the experience calm and focused rather than overwhelming.
+Users can navigate both through conversational AI chat and traditional structured navigation, allowing each person to engage in the way that feels most natural to them.
+Home Screen
+When a patient opens the application, they are presented with a minimal, purposeful home view containing three primary elements:
+### 1. Action List
+A prioritized list of things the patient needs to do — monitoring symptom progression, completing treatment steps, tracking health activities, and so on.
+
+- Actions can be created automatically from provider treatment plans or initiated by the patient themselves.
+- Tapping an action shifts focus to it: the view expands to surface relevant context, details, and tools needed to complete it.
+- Tapping the list itself opens a management view where the patient can review, prioritize, and organize all current actions.
+
+### 2. Event List
+A timeline of upcoming and recent engagements with the healthcare system — appointments, prescription pickups, lab tests, referrals, and similar touchpoints.
+
+- Events are automatically created and synchronized from provider scheduling systems and prescription records.
+- Tapping an event surfaces the context and tools most relevant to the patient for that specific engagement.
+- Tapping the list opens a full management view for reviewing and organizing upcoming events.
+
+### 3. Persistent Chat
+An always-available conversational interface for navigating and managing healthcare needs interactively.
+
+- The chat is context-aware, reflecting whatever the patient is currently focused on — whether a specific action, event, or the home view.
+- The chat proactively and transparently prompts the patient before sharing any information with the healthcare system or storing it locally, maintaining clear boundaries around data and consent.
 
 ## 2. Core Feature Set
 *   **Health Progress Dashboard:** Time-series visualization of vitals (BP, Heart Rate) and lab trends (HbA1c, Cholesterol) with interpretation of abnormal flags.
