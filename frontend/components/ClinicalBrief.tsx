@@ -536,7 +536,7 @@ export default function ClinicalBrief({ brief }: ClinicalBriefProps) {
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {medication_alerts.temporal_correlations.map((corr, i) => (
-                  <CorrelationAlert key={`${corr.drug_name}-${i}`} corr={corr} />
+                  <CorrelationAlert key={`corr-${corr.drug_name}-${corr.symptom_date}-${i}`} corr={corr} />
                 ))}
               </div>
             </div>
@@ -551,8 +551,8 @@ export default function ClinicalBrief({ brief }: ClinicalBriefProps) {
                 Expiring Medications
               </h4>
               <div className="space-y-2">
-                {medication_alerts.expiring.map((med) => (
-                  <ExpiringMedAlert key={med.drug_name} med={med} />
+                {medication_alerts.expiring.map((med, i) => (
+                  <ExpiringMedAlert key={`exp-${med.drug_name}-${i}`} med={med} />
                 ))}
               </div>
             </div>
@@ -567,9 +567,9 @@ export default function ClinicalBrief({ brief }: ClinicalBriefProps) {
                 Cross-Facility Medications
               </h4>
               <div className="space-y-2">
-                {medication_alerts.cross_facility.map((med) => (
+                {medication_alerts.cross_facility.map((med, i) => (
                   <CrossFacilityMedCard
-                    key={`${med.drug_name}-${med.facility}`}
+                    key={`xfac-${med.drug_name}-${med.facility}-${i}`}
                     med={med}
                   />
                 ))}
