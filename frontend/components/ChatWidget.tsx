@@ -3,7 +3,14 @@
 import { useState, useRef, useEffect } from "react";
 import { sendChatMessage } from "@/lib/api";
 import type { ChatMessage } from "@/lib/types";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import mockClinicalData from "@/lib/mock_clinical_context.json";
 
+type LocalChatMessage = ChatMessage & {
+  bubbles?: { label: string; type: string; url?: string }[];
+  metricsToHighlight?: string[];
+};
 interface ChatWidgetProps {
   patientId: string;
   patientName: string;
@@ -12,7 +19,7 @@ interface ChatWidgetProps {
 
 export default function ChatWidget({ patientId, patientName, onMetricsUpdate }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<LocalChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([
@@ -47,14 +54,33 @@ export default function ChatWidget({ patientId, patientName, onMetricsUpdate }: 
 
     try {
       const response = await sendChatMessage(patientId, messageText, messages);
-      const assistantMessage: ChatMessage = { role: "assistant", content: response.response };
+      let bubbles = undefined;
+      let mockMetrics = undefined;
+
+      // Check mock context for keyword match
+      for (const entry of mockClinicalData) {
+        if (entry.keywords.some((kw) => messageText.toLowerCase().includes(kw))) {
+          bubbles = entry.bubbles;
+          mockMetrics = entry.metricsToHighlight;
+          break;
+        }
+      }
+
+      const assistantMessage: LocalChatMessage = { 
+        role: "assistant", 
+        content: response.response,
+        bubbles,
+        metricsToHighlight: mockMetrics
+      };
       setMessages([...updatedMessages, assistantMessage]);
 
       if (response.suggested_questions && response.suggested_questions.length > 0) {
         setSuggestedQuestions(response.suggested_questions);
       }
 
-      if (response.relevant_metrics && response.relevant_metrics.length > 0 && onMetricsUpdate) {
+      if (mockMetrics && mockMetrics.length > 0 && onMetricsUpdate) {
+        onMetricsUpdate(mockMetrics);
+      } else if (response.relevant_metrics && response.relevant_metrics.length > 0 && onMetricsUpdate) {
         onMetricsUpdate(response.relevant_metrics);
       }
     } catch {
@@ -140,12 +166,58 @@ export default function ChatWidget({ patientId, patientName, onMetricsUpdate }: 
         )}
 
         {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`chat-bubble ${msg.role === "user" ? "chat-bubble-user" : "chat-bubble-assistant"}`}
-            style={{ fontSize: 13, lineHeight: 1.5 }}
-          >
-            {msg.content}
+          <div key={i} className="mb-4">
+            <div
+              className={`chat-bubble ${msg.role === "user" ? "chat-bubble-user" : "chat-bubble-assistant"} chat-markdown`}
+              style={{ fontSize: 13, lineHeight: 1.5 }}
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+            </div>
+            
+            {msg.bubbles && msg.bubbles.length > 0 && (
+              <div className="flex flex-col gap-2 mt-2 ml-2 animate-fade-in-up">
+                {msg.bubbles.map((b, idx) => (
+                  <div 
+                    key={idx}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer"
+                    style={{
+                      background: b.type === "trial" ? "rgba(16, 185, 129, 0.1)" : "rgba(110, 207, 255, 0.1)",
+                      color: b.type === "trial" ? "var(--color-healthy)" : "var(--text-accent)",
+                      border: b.type === "trial" ? "1px solid rgba(16, 185, 129, 0.2)" : "1px solid rgba(110, 207, 255, 0.2)",
+                      alignSelf: "flex-start",
+                      transition: "transform 0.15s ease"
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
+                    onClick={() => {
+                        if (msg.metricsToHighlight && onMetricsUpdate) {
+                            onMetricsUpdate(msg.metricsToHighlight);
+                        }
+                        if (b.url) {
+                            window.open(b.url, "_blank");
+                        }
+                    }}
+                  >
+                    {b.type === "trial" ? (
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="flex-shrink-0">
+                         <path d="M8 15A7 7 0 108 1a7 7 0 000 14z" stroke="currentColor" strokeWidth="1.5"/>
+                         <path d="M7.5 4v4l2.5 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="flex-shrink-0">
+                         <path d="M14 4L6 12L2 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                    <span className="flex-1 truncate">{b.label}</span>
+                    {b.url && (
+                        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" className="flex-shrink-0 ml-1 opacity-60">
+                            <path d="M12.5 8v4.5A1.5 1.5 0 0111 14H3.5a1.5 1.5 0 01-1.5-1.5v-7.5A1.5 1.5 0 013.5 3.5H8M10 2h4v4M14 2L7 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ))}
 

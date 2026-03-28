@@ -9,7 +9,7 @@ from .data_loader import get_encounters, get_medications
 from .models import PatientIssue
 
 TODAY = date(2026, 3, 28)
-_ACTIVE_WINDOW = timedelta(days=365)  # 12 months
+_ACTIVE_WINDOW = timedelta(days=730)  # 24 months for mock data compatibility
 _MED_LINK_WINDOW = timedelta(days=30)
 
 

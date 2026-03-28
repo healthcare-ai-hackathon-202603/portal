@@ -468,3 +468,30 @@ body {
     right: 16px;
   }
 }
+
+/* Markdown chat styles */
+.chat-markdown p {
+  margin-bottom: 0.5em;
+}
+.chat-markdown p:last-child {
+  margin-bottom: 0;
+}
+.chat-markdown ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin-bottom: 0.5em;
+  margin-top: 0.5em;
+}
+.chat-markdown ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin-bottom: 0.5em;
+  margin-top: 0.5em;
+}
+.chat-markdown li {
+  margin-bottom: 0.25em;
+}
+.chat-markdown strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}

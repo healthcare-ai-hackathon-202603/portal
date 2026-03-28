@@ -1,0 +1,34 @@
+[
+  {
+    "keywords": ["hypothyroidism", "tsh"],
+    "metricsToHighlight": ["TSH", "Heart Rate"],
+    "bubbles": [
+      {
+        "label": "Latest Guidance: Maintain TSH 0.4-4.0",
+        "type": "guideline",
+        "url": "https://www.endocrine.org/guidelines"
+      },
+      {
+        "label": "Nearby Trial: Royal Jubilee - Novel TSH treatments",
+        "type": "trial",
+        "url": "https://clinicaltrials.gov"
+      }
+    ]
+  },
+  {
+    "keywords": ["hypertension", "blood pressure", "bp"],
+    "metricsToHighlight": ["Systolic Blood Pressure", "Diastolic Blood Pressure"],
+    "bubbles": [
+      {
+        "label": "Latest Guidance: Keep BP < 130/80",
+        "type": "guideline",
+        "url": "https://www.heart.org/en/health-topics/high-blood-pressure"
+      },
+      {
+        "label": "Nearby Trial: Victoria General - Dietary Interventions for HTN",
+        "type": "trial",
+        "url": "https://clinicaltrials.gov"
+      }
+    ]
+  }
+]

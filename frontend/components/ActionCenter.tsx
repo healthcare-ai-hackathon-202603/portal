@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { AlertItem, PatientMedication, LabTrajectory } from "@/lib/types";
 
 export interface ActionItem {
@@ -94,6 +95,16 @@ function deriveActionItems(
     }
   }
 
+  // Inject a hard-coded completed task to demonstrate the cross-check functionality
+  items.push({
+    id: "mock_completed_task",
+    type: "follow_up",
+    priority: "info",
+    title: "Neurology Pre-screening Questionnaire",
+    context: "Completed on March 26, 2026",
+    cta: "Review",
+  });
+
   // Sort: urgent first, then warning
   items.sort((a, b) => {
     const order = { urgent: 0, warning: 1, info: 2 };
@@ -172,6 +183,8 @@ interface ActionCenterProps {
 }
 
 export default function ActionCenter({ alerts, medications, labTrajectories }: ActionCenterProps) {
+  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set(["mock_completed_task"]));
+  
   const items = deriveActionItems(alerts, medications, labTrajectories);
 
   if (items.length === 0) {
@@ -204,29 +217,57 @@ export default function ActionCenter({ alerts, medications, labTrajectories }: A
     );
   }
 
+  const toggleComplete = (id: string) => {
+    const next = new Set(completedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setCompletedIds(next);
+  };
+
   return (
     <section>
       <SectionHeader title="Your Action Items" count={items.length} />
       <div className="space-y-3 stagger">
         {items.map((item) => {
+          const isCompleted = completedIds.has(item.id);
           const config = priorityConfig[item.priority];
+          
           return (
             <div
               key={item.id}
-              className="relative rounded-2xl overflow-hidden"
+              className="relative rounded-2xl overflow-hidden transition-all duration-300"
               style={{
-                background: `linear-gradient(135deg, ${config.glowColor}, rgba(17, 24, 32, 0.0))`,
+                background: isCompleted ? "var(--bg-secondary)" : `linear-gradient(135deg, ${config.glowColor}, rgba(17, 24, 32, 0.0))`,
                 border: `1px solid rgba(255,255,255,0.07)`,
-                borderLeft: `3px solid ${config.borderColor}`,
+                borderLeft: `3px solid ${isCompleted ? "var(--color-healthy)" : config.borderColor}`,
+                opacity: isCompleted ? 0.6 : 1,
               }}
             >
               <div className="flex items-start gap-4 p-4 sm:p-5">
+                
+                {/* Checkbox */}
+                <button
+                  onClick={() => toggleComplete(item.id)}
+                  className="mt-1 w-6 h-6 rounded-full border-[1.5px] flex items-center justify-center flex-shrink-0 transition-all duration-200 cursor-pointer"
+                  style={{
+                    borderColor: isCompleted ? "var(--color-healthy)" : "var(--border-strong)",
+                    background: isCompleted ? "var(--color-healthy)" : "transparent",
+                    color: "var(--bg-primary)",
+                  }}
+                >
+                  {isCompleted && (
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M3 6.5L5 8.5L9 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </button>
+
                 {/* Icon */}
                 <div
                   className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
                   style={{
-                    background: `${config.glowColor}`,
-                    color: config.accentColor,
+                    background: isCompleted ? "var(--bg-surface)" : `${config.glowColor}`,
+                    color: isCompleted ? "var(--text-muted)" : config.accentColor,
                     border: `1px solid ${config.borderColor}22`,
                   }}
                 >
@@ -238,23 +279,23 @@ export default function ActionCenter({ alerts, medications, labTrajectories }: A
                   <div className="flex items-center gap-2 mb-1">
                     <span
                       className="text-[10px] font-semibold uppercase tracking-widest"
-                      style={{ color: config.labelColor, opacity: 0.85 }}
+                      style={{ color: isCompleted ? "var(--text-muted)" : config.labelColor, opacity: 0.85 }}
                     >
-                      {config.label}
+                      {isCompleted ? "Completed" : config.label}
                     </span>
                     <span
                       className="w-1 h-1 rounded-full flex-shrink-0"
-                      style={{ background: config.dotColor, opacity: 0.6 }}
+                      style={{ background: isCompleted ? "var(--text-muted)" : config.dotColor, opacity: 0.6 }}
                     />
                   </div>
                   <p
-                    className="text-sm font-semibold leading-snug mb-1"
-                    style={{ color: "var(--text-primary)" }}
+                    className={`text-sm font-semibold leading-snug mb-1 ${isCompleted ? 'line-through' : ''}`}
+                    style={{ color: isCompleted ? "var(--text-muted)" : "var(--text-primary)" }}
                   >
                     {item.title}
                   </p>
                   <p
-                    className="text-xs leading-relaxed"
+                    className={`text-xs leading-relaxed ${isCompleted ? 'line-through' : ''}`}
                     style={{ color: "var(--text-secondary)" }}
                   >
                     {item.context}
@@ -263,37 +304,20 @@ export default function ActionCenter({ alerts, medications, labTrajectories }: A
 
                 {/* CTA */}
                 <button
-                  className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer hidden sm:block"
+                  className="flex-shrink-0 px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer hidden sm:flex items-center gap-2"
                   style={{
-                    color: config.accentColor,
-                    background: `${config.glowColor}`,
+                    color: isCompleted ? "var(--text-muted)" : config.accentColor,
+                    background: isCompleted ? "var(--bg-surface)" : `${config.glowColor}`,
                     border: `1px solid ${config.borderColor}33`,
                   }}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = `${config.borderColor}18`;
+                    if (!isCompleted) (e.currentTarget as HTMLButtonElement).style.background = `${config.borderColor}18`;
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = `${config.glowColor}`;
+                    if (!isCompleted) (e.currentTarget as HTMLButtonElement).style.background = `${config.glowColor}`;
                   }}
                 >
-                  {item.cta}
-                </button>
-              </div>
-
-              {/* Mobile CTA */}
-              <div
-                className="sm:hidden px-4 pb-4"
-                style={{ paddingLeft: "calc(1rem + 2rem + 1rem)" }}
-              >
-                <button
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg cursor-pointer"
-                  style={{
-                    color: config.accentColor,
-                    background: `${config.glowColor}`,
-                    border: `1px solid ${config.borderColor}33`,
-                  }}
-                >
-                  {item.cta}
+                  <span className="text-xs font-medium">{item.cta}</span>
                 </button>
               </div>
             </div>

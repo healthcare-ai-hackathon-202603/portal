@@ -194,7 +194,7 @@ def handle_patient_chat(
         )
 
     # Check for API key
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = os.environ.get("CLAUDE_API_KEY")
     if not api_key:
         return ChatResponse(
             response=(
@@ -207,6 +207,7 @@ def handle_patient_chat(
                 "What medications am I currently taking?",
                 "Do I have any overdue health checks?",
             ],
+            relevant_metrics=_detect_relevant_metrics(request.message),
         )
 
     # Build system prompt with patient context
@@ -248,20 +249,22 @@ def handle_patient_chat(
                 "What medications am I currently taking?",
                 "Do I have any overdue health checks?",
             ],
+            relevant_metrics=_detect_relevant_metrics(request.message),
         )
     except Exception as exc:
         # Log but don't expose internal errors to the patient
+        error_msg = str(exc)
         print(f"[chat] Anthropic API error for patient {patient_id}: {exc}")
         return ChatResponse(
             response=(
-                "I'm having trouble connecting right now. Please try again in a moment, "
-                "or reach out to your healthcare provider directly for urgent questions."
+                f"I'm sorry, I'm having trouble connecting right now. Please try again in a moment. ERROR DETAILS: {error_msg}"
             ),
             suggested_questions=[
                 "What do my recent lab results mean?",
                 "What medications am I currently taking?",
                 "Do I have any overdue health checks?",
             ],
+            relevant_metrics=_detect_relevant_metrics(request.message),
         )
 
     # Parse out the suggested questions from the response

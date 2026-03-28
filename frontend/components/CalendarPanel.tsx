@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { AlertItem, PatientMedication, Encounter } from "@/lib/types";
 import { FACILITY_SHORT_NAMES } from "@/lib/types";
 
@@ -23,7 +23,7 @@ interface CalendarPanelProps {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const TODAY = new Date("2026-03-28");
+const TODAY = new Date("2026-03-28T12:00:00Z"); // fixed mid-day to avoid timezone offset issues
 const TODAY_YEAR = TODAY.getFullYear();
 const TODAY_MONTH = TODAY.getMonth();
 const TODAY_DATE = TODAY.getDate();
@@ -57,14 +57,6 @@ const typeBadgeConfig: Record<UpcomingItem["type"], { label: string; color: stri
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function daysInMonth(year: number, month: number): number {
-  return new Date(year, month + 1, 0).getDate();
-}
-
-function startDayOfMonth(year: number, month: number): number {
-  return new Date(year, month, 1).getDay();
-}
-
 function formatShortDate(d: Date): string {
   return `${MONTH_NAMES[d.getMonth()].slice(0, 3)} ${d.getDate()}`;
 }
@@ -75,200 +67,262 @@ function addDays(d: Date, n: number): Date {
   return r;
 }
 
-function isSameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-// ─── Derive upcoming items ──────────────────────────────────────────────────
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
 
-function deriveUpcomingItems(
-  alerts: AlertItem[],
-  medications: PatientMedication[],
-  recentEncounters: Encounter[],
-): UpcomingItem[] {
-  const items: UpcomingItem[] = [];
-
-  // 1. Care gaps from alerts
-  for (const alert of alerts) {
-    if (alert.category !== "care_gap") continue;
-    // Suggest "this week" — pick a date 3 days from today
-    const suggestedDate = addDays(TODAY, 3);
-    items.push({
-      id: `cal_care_gap_${alert.title}`,
-      type: "test",
-      title: `Schedule ${alert.title} — overdue`,
-      suggestedLabel: "This week",
-      suggestedDate,
-      priority: alert.severity === "urgent" ? "urgent" : "warning",
-    });
-  }
-
-  // 2. Expiring medications
-  for (const med of medications) {
-    if (!med.active || !med.clinical_details?.end_date) continue;
-    const endDate = new Date(med.clinical_details.end_date);
-    const daysLeft = Math.ceil((endDate.getTime() - TODAY.getTime()) / (1000 * 60 * 60 * 24));
-    if (daysLeft > 0 && daysLeft <= 30) {
-      // Suggest renewal a few days before expiry
-      const suggestedDate = addDays(endDate, -3);
-      const endLabel = formatShortDate(endDate);
-      items.push({
-        id: `cal_med_${med.name}`,
-        type: "medication",
-        title: `Renew ${med.name} before ${endLabel}`,
-        suggestedLabel: daysLeft <= 7 ? `${daysLeft}d left` : `By ${formatShortDate(suggestedDate)}`,
-        suggestedDate: suggestedDate < TODAY ? TODAY : suggestedDate,
-        priority: daysLeft <= 7 ? "urgent" : "warning",
-      });
-    }
-  }
-
-  // 3. Recent encounters → follow-up suggestions (last 30 days)
-  const thirtyDaysAgo = addDays(TODAY, -30);
-  for (const enc of recentEncounters) {
-    const encDate = new Date(enc.encounter_date);
-    if (encDate < thirtyDaysAgo || encDate > TODAY) continue;
-    // Suggest follow-up 2 weeks after encounter
-    const suggestedDate = addDays(encDate, 14);
-    // Only include if the follow-up date hasn't passed yet
-    if (suggestedDate < TODAY) continue;
-    const facility = FACILITY_SHORT_NAMES[enc.facility] || enc.facility;
-    items.push({
-      id: `cal_followup_${enc.encounter_id}`,
-      type: "follow-up",
-      title: `Follow-up from ${enc.chief_complaint} at ${facility}`,
-      suggestedLabel: formatShortDate(suggestedDate),
-      suggestedDate,
-      priority: "info",
-    });
-  }
-
-  // Sort by date, then priority
-  const priorityOrder = { urgent: 0, warning: 1, info: 2 };
-  items.sort((a, b) => {
-    const dateDiff = a.suggestedDate.getTime() - b.suggestedDate.getTime();
-    if (dateDiff !== 0) return dateDiff;
-    return priorityOrder[a.priority] - priorityOrder[b.priority];
-  });
-
-  // Deduplicate by id
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    if (seen.has(item.id)) return false;
-    seen.add(item.id);
-    return true;
-  });
+function startDayOfMonth(year: number, month: number): number {
+  return new Date(year, month, 1).getDay();
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export default function CalendarPanel({ alerts, medications, recentEncounters }: CalendarPanelProps) {
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(TODAY));
+  const [viewMode, setViewMode] = useState<"day" | "week" | "month">("month");
+  const [isLoading, setIsLoading] = useState(false);
+  const [scheduledIds, setScheduledIds] = useState<Set<string>>(new Set());
 
-  const items = useMemo(
-    () => deriveUpcomingItems(alerts, medications, recentEncounters),
-    [alerts, medications, recentEncounters],
-  );
+  // Simulate progressive loading when switching views
+  useEffect(() => {
+    setIsLoading(true);
+    const t = setTimeout(() => {
+      setIsLoading(false);
+    }, 400); // 400ms loading skeleton simulation
+    return () => clearTimeout(t);
+  }, [viewMode, selectedDate]);
 
-  // Build a set of days-of-month that have items (within current month)
-  const itemDaySet = useMemo(() => {
-    const s = new Set<number>();
-    for (const item of items) {
-      if (item.suggestedDate.getFullYear() === TODAY_YEAR && item.suggestedDate.getMonth() === TODAY_MONTH) {
-        s.add(item.suggestedDate.getDate());
+  const items = useMemo(() => {
+    const rawItems: UpcomingItem[] = [];
+
+    // Derive care gaps
+    for (const alert of alerts) {
+      if (alert.category !== "care_gap") continue;
+      const suggestedDate = addDays(TODAY, 3);
+      rawItems.push({
+        id: `cal_care_gap_${alert.title}`,
+        type: "test",
+        title: `Schedule ${alert.title} — overdue`,
+        suggestedLabel: "This week",
+        suggestedDate,
+        priority: alert.severity === "urgent" ? "urgent" : "warning",
+      });
+    }
+
+    // Derive expiring meds
+    for (const med of medications) {
+      if (!med.active || !med.clinical_details?.end_date) continue;
+      const endDate = new Date(med.clinical_details.end_date);
+      const daysLeft = Math.ceil((endDate.getTime() - TODAY.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysLeft > 0 && daysLeft <= 30) {
+        const suggestedDate = addDays(endDate, -3);
+        const endLabel = formatShortDate(endDate);
+        rawItems.push({
+          id: `cal_med_${med.name}`,
+          type: "medication",
+          title: `Renew ${med.name} before ${endLabel}`,
+          suggestedLabel: daysLeft <= 7 ? `${daysLeft}d left` : `By ${formatShortDate(suggestedDate)}`,
+          suggestedDate: suggestedDate < TODAY ? TODAY : suggestedDate,
+          priority: daysLeft <= 7 ? "urgent" : "warning",
+        });
       }
+    }
+
+    // Mock injected items to pad the calendar visually
+    rawItems.push({
+      id: "mock_cal_1",
+      type: "follow-up",
+      title: "Neurology Specialist Assessment",
+      suggestedLabel: "Tomorrow",
+      suggestedDate: addDays(TODAY, 1),
+      priority: "info",
+    });
+
+    rawItems.push({
+      id: "mock_cal_2",
+      type: "test",
+      title: "Complete Blood Count (CBC) Panel",
+      suggestedLabel: "Apr 5",
+      suggestedDate: addDays(TODAY, 8), // April 5th approx
+      priority: "warning",
+    });
+    
+    rawItems.push({
+      id: "mock_cal_3",
+      type: "test",
+      title: "Annual Preventative Screening",
+      suggestedLabel: "Apr 12",
+      suggestedDate: addDays(TODAY, 15), 
+      priority: "info",
+    });
+
+    // Sort by date, then priority
+    const priorityOrder = { urgent: 0, warning: 1, info: 2 };
+    rawItems.sort((a, b) => {
+      const dateDiff = a.suggestedDate.getTime() - b.suggestedDate.getTime();
+      if (dateDiff !== 0) return dateDiff;
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    });
+
+    // Deduplicate by id
+    const seen = new Set<string>();
+    return rawItems.filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  }, [alerts, medications]);
+
+  // Build a set of date strings (YYYY-MM-DD) that have items
+  const itemDatesSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const item of items) {
+      const d = item.suggestedDate;
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      s.add(key);
     }
     return s;
   }, [items]);
 
-  // Filter items when a day is selected
+  // Determine which items to display based on ViewMode
   const visibleItems = useMemo(() => {
-    if (selectedDay === null) return items;
     return items.filter((item) => {
-      return (
-        item.suggestedDate.getFullYear() === TODAY_YEAR &&
-        item.suggestedDate.getMonth() === TODAY_MONTH &&
-        item.suggestedDate.getDate() === selectedDay
-      );
+      const idate = startOfDay(item.suggestedDate);
+      if (viewMode === "day") {
+        return idate.getTime() === selectedDate.getTime();
+      } else if (viewMode === "week") {
+        const dayOfWeek = selectedDate.getDay();
+        const startOfWeek = addDays(selectedDate, -dayOfWeek);
+        const endOfWeek = addDays(startOfWeek, 6);
+        return idate >= startOfWeek && idate <= endOfWeek;
+      } else {
+        // month view
+        return idate.getFullYear() === selectedDate.getFullYear() && idate.getMonth() === selectedDate.getMonth();
+      }
     });
-  }, [items, selectedDay]);
+  }, [items, selectedDate, viewMode]);
 
-  // Calendar grid computation
-  const totalDays = daysInMonth(TODAY_YEAR, TODAY_MONTH);
-  const firstDay = startDayOfMonth(TODAY_YEAR, TODAY_MONTH);
-  const prevMonthDays = daysInMonth(TODAY_YEAR, TODAY_MONTH - 1);
+  // Build grid cells for the calendar
+  const activeCells = useMemo(() => {
+    const cells: { dateObj: Date; isSelected: boolean; isToday: boolean; hasItem: boolean; isCurrentMonthBase: boolean }[] = [];
+    
+    if (viewMode === "month") {
+      const year = selectedDate.getFullYear();
+      const month = selectedDate.getMonth();
+      const totalDays = daysInMonth(year, month);
+      const firstDay = startDayOfMonth(year, month);
+      const prevMonthDays = daysInMonth(year, month - 1);
 
-  // Build grid cells
-  const cells: { day: number; currentMonth: boolean }[] = [];
-  // Previous month trailing days
-  for (let i = firstDay - 1; i >= 0; i--) {
-    cells.push({ day: prevMonthDays - i, currentMonth: false });
-  }
-  // Current month
-  for (let d = 1; d <= totalDays; d++) {
-    cells.push({ day: d, currentMonth: true });
-  }
-  // Next month leading days to fill grid (fill to 35 or 42)
-  const targetCells = cells.length > 35 ? 42 : 35;
-  let nextDay = 1;
-  while (cells.length < targetCells) {
-    cells.push({ day: nextDay++, currentMonth: false });
-  }
+      // Previous month trailing
+      for (let i = firstDay - 1; i >= 0; i--) {
+        const d = new Date(year, month - 1, prevMonthDays - i);
+        cells.push({ dateObj: d, isSelected: false, isToday: false, hasItem: itemDatesSet.has(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`), isCurrentMonthBase: false });
+      }
+      // Current month
+      for (let d = 1; d <= totalDays; d++) {
+        const dateObj = new Date(year, month, d);
+        cells.push({ dateObj, isSelected: startOfDay(dateObj).getTime() === startOfDay(selectedDate).getTime(), isToday: startOfDay(dateObj).getTime() === startOfDay(TODAY).getTime(), hasItem: itemDatesSet.has(`${dateObj.getFullYear()}-${dateObj.getMonth()}-${dateObj.getDate()}`), isCurrentMonthBase: true });
+      }
+      // Next month leading
+      const targetCells = cells.length > 35 ? 42 : 35;
+      let nextDay = 1;
+      while (cells.length < targetCells) {
+        const d = new Date(year, month + 1, nextDay++);
+        cells.push({ dateObj: d, isSelected: false, isToday: false, hasItem: itemDatesSet.has(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`), isCurrentMonthBase: false });
+      }
 
-  function handleDayClick(day: number, currentMonth: boolean) {
-    if (!currentMonth) return;
-    setSelectedDay((prev) => (prev === day ? null : day));
-  }
+    } else if (viewMode === "week") {
+      const dayOfWeek = selectedDate.getDay();
+      const startOfWeekDate = addDays(selectedDate, -dayOfWeek);
+      for (let i = 0; i < 7; i++) {
+        const dateObj = addDays(startOfWeekDate, i);
+        cells.push({
+          dateObj,
+          isSelected: startOfDay(dateObj).getTime() === startOfDay(selectedDate).getTime(),
+          isToday: startOfDay(dateObj).getTime() === startOfDay(TODAY).getTime(),
+          hasItem: itemDatesSet.has(`${dateObj.getFullYear()}-${dateObj.getMonth()}-${dateObj.getDate()}`),
+          isCurrentMonthBase: dateObj.getMonth() === selectedDate.getMonth()
+        });
+      }
+    } else if (viewMode === "day") {
+      cells.push({
+        dateObj: selectedDate,
+        isSelected: true,
+        isToday: startOfDay(selectedDate).getTime() === startOfDay(TODAY).getTime(),
+        hasItem: itemDatesSet.has(`${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`),
+        isCurrentMonthBase: true
+      });
+    }
+    
+    return cells;
+  }, [viewMode, selectedDate, itemDatesSet]);
 
   return (
     <section>
-      {/* Header */}
-      <div className="flex items-center gap-2.5 mb-4">
-        <h2
-          className="text-sm font-semibold tracking-wide"
-          style={{ color: "var(--text-secondary)", fontFamily: "'DM Sans', sans-serif" }}
-        >
-          Upcoming
-        </h2>
-        <span
-          className="text-xs font-medium"
-          style={{ color: "var(--text-muted)" }}
-        >
-          {MONTH_NAMES[TODAY_MONTH]} {TODAY_YEAR}
-        </span>
-      </div>
-
-      {/* Mini Calendar */}
-      <div
-        className="card p-4 mb-4"
-        style={{ background: "var(--bg-secondary)" }}
-      >
-        {/* Day-of-week headers */}
-        <div className="calendar-grid mb-1">
-          {DAY_LABELS.map((label, i) => (
-            <div
-              key={`dh-${i}`}
-              className="text-[10px] font-semibold uppercase tracking-wider py-1"
-              style={{ color: "var(--text-muted)" }}
+      {/* Header with Toggles */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2.5">
+          <h2
+            className="text-sm font-semibold tracking-wide"
+            style={{ color: "var(--text-secondary)", fontFamily: "'DM Sans', sans-serif" }}
+          >
+            Calendar
+          </h2>
+          <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+            {MONTH_NAMES[selectedDate.getMonth()]} {selectedDate.getFullYear()}
+          </span>
+        </div>
+        
+        {/* Progressive View Toggles */}
+        <div className="flex p-0.5 rounded-lg" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-subtle)" }}>
+          {(["day", "week", "month"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className="text-[10px] capitalize font-semibold px-2.5 py-1 rounded-md transition-all duration-200 cursor-pointer"
+              style={{
+                background: viewMode === mode ? "var(--bg-surface)" : "transparent",
+                color: viewMode === mode ? "var(--text-primary)" : "var(--text-muted)",
+                boxShadow: viewMode === mode ? "0 1px 2px rgba(0,0,0,0.2)" : "none",
+              }}
             >
-              {label}
-            </div>
+              {mode}
+            </button>
           ))}
         </div>
+      </div>
 
-        {/* Date cells */}
-        <div className="calendar-grid">
-          {cells.map((cell, i) => {
-            const isToday = cell.currentMonth && cell.day === TODAY_DATE;
-            const hasItem = cell.currentMonth && itemDaySet.has(cell.day);
-            const isSelected = cell.currentMonth && selectedDay === cell.day;
+      {/* Dynamic Mini Calendar */}
+      <div
+        className="card p-4 mx-auto mb-4 transition-all duration-300 overflow-hidden"
+        style={{ background: "var(--bg-secondary)" }}
+      >
+        {viewMode !== "day" && (
+          <div className="calendar-grid mb-1">
+            {DAY_LABELS.map((label, i) => (
+              <div
+                key={`dh-${i}`}
+                className="text-[10px] font-semibold uppercase tracking-wider py-1"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {label}
+              </div>
+            ))}
+          </div>
+        )}
 
+        <div className={viewMode === "day" ? "flex justify-center" : "calendar-grid"}>
+          {activeCells.map((cell, i) => {
             const classes = [
               "calendar-day",
-              !cell.currentMonth && "other-month",
-              isToday && "today",
-              hasItem && "has-item",
-              isSelected && "selected",
+              !cell.isCurrentMonthBase && "other-month",
+              cell.isToday && "today",
+              cell.hasItem && "has-item",
+              cell.isSelected && "selected",
             ]
               .filter(Boolean)
               .join(" ");
@@ -277,100 +331,109 @@ export default function CalendarPanel({ alerts, medications, recentEncounters }:
               <div
                 key={`d-${i}`}
                 className={classes}
-                onClick={() => handleDayClick(cell.day, cell.currentMonth)}
+                onClick={() => setSelectedDate(cell.dateObj)}
+                title={cell.dateObj.toDateString()}
               >
-                {cell.day}
+                {viewMode === "day" ? formatShortDate(cell.dateObj) : cell.dateObj.getDate()}
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Upcoming items list */}
-      {visibleItems.length === 0 ? (
-        <div
-          className="card p-5 flex items-center gap-3"
-          style={{ borderColor: "rgba(110, 207, 255, 0.12)" }}
-        >
+      {/* Upcoming items list (with progressive loading overlay) */}
+      <div className={`transition-opacity duration-300 ${isLoading ? "opacity-40 pointer-events-none" : "opacity-100"}`}>
+        {visibleItems.length === 0 ? (
           <div
-            className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: "rgba(110, 207, 255, 0.08)", color: "var(--text-accent)" }}
+            className="card p-5 flex items-center gap-3 animate-fade-in"
+            style={{ borderColor: "rgba(110, 207, 255, 0.12)" }}
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" strokeWidth="1.3" />
-              <path d="M5 1.5V4.5M11 1.5V4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-            </svg>
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(110, 207, 255, 0.08)", color: "var(--text-accent)" }}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" strokeWidth="1.3" />
+                <path d="M5 1.5V4.5M11 1.5V4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+              </svg>
+            </div>
+            <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+              {viewMode === "day" 
+                ? "No items scheduled for this day." 
+                : `No items scheduled for this ${viewMode}.`}
+            </p>
           </div>
-          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-            {selectedDay !== null
-              ? "No items scheduled for this day."
-              : "No upcoming items right now."}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-2.5 stagger">
-          {visibleItems.slice(0, 6).map((item) => {
-            const badge = typeBadgeConfig[item.type];
-            return (
-              <div
-                key={item.id}
-                className="card p-4 flex items-start gap-3"
-                style={{ background: "var(--bg-secondary)" }}
-              >
-                {/* Left: date label */}
+        ) : (
+          <div className="space-y-2.5 stagger">
+            {visibleItems.slice(0, 6).map((item) => {
+              const badge = typeBadgeConfig[item.type];
+              return (
                 <div
-                  className="flex-shrink-0 w-14 pt-0.5 text-center"
+                  key={item.id}
+                  className="card p-4 flex items-start gap-3"
+                  style={{ background: "var(--bg-secondary)" }}
                 >
-                  <span
-                    className="text-[10px] font-semibold uppercase tracking-wider block leading-tight"
-                    style={{ color: item.priority === "urgent" ? "var(--color-urgent)" : "var(--text-accent)" }}
-                  >
-                    {item.suggestedLabel}
-                  </span>
-                </div>
+                  <div className="flex-shrink-0 pt-0.5 text-center w-14">
+                    <span
+                      className="text-[10px] font-semibold uppercase tracking-wider block leading-tight"
+                      style={{ color: item.priority === "urgent" ? "var(--color-urgent)" : "var(--text-accent)" }}
+                    >
+                      {item.suggestedLabel}
+                    </span>
+                  </div>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <p
-                    className="text-sm font-medium leading-snug mb-1.5"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    {item.title}
-                  </p>
-                  <span
-                    className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="text-sm font-medium leading-snug mb-1.5"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {item.title}
+                    </p>
+                    <span
+                      className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                      style={{
+                        color: badge.color,
+                        background: badge.bg,
+                        border: `1px solid ${badge.border}`,
+                      }}
+                    >
+                      {badge.label}
+                    </span>
+                  </div>
+
+                  <button
+                    className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer hidden sm:block"
                     style={{
-                      color: badge.color,
-                      background: badge.bg,
-                      border: `1px solid ${badge.border}`,
+                      color: scheduledIds.has(item.id) ? "var(--color-healthy)" : "var(--text-accent)",
+                      background: scheduledIds.has(item.id) ? "rgba(16, 185, 129, 0.1)" : "rgba(110, 207, 255, 0.06)",
+                      border: scheduledIds.has(item.id) ? "1px solid rgba(16, 185, 129, 0.2)" : "1px solid rgba(110, 207, 255, 0.15)",
+                    }}
+                    onClick={() => {
+                      setScheduledIds((prev) => {
+                        const next = new Set(prev);
+                        next.add(item.id);
+                        return next;
+                      });
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!scheduledIds.has(item.id)) {
+                        (e.currentTarget as HTMLButtonElement).style.background = "rgba(110, 207, 255, 0.12)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!scheduledIds.has(item.id)) {
+                        (e.currentTarget as HTMLButtonElement).style.background = "rgba(110, 207, 255, 0.06)";
+                      }
                     }}
                   >
-                    {badge.label}
-                  </span>
+                    {scheduledIds.has(item.id) ? "Scheduled ✓" : "Schedule"}
+                  </button>
                 </div>
-
-                {/* CTA */}
-                <button
-                  className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer"
-                  style={{
-                    color: "var(--text-accent)",
-                    background: "rgba(110, 207, 255, 0.06)",
-                    border: "1px solid rgba(110, 207, 255, 0.15)",
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(110, 207, 255, 0.12)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(110, 207, 255, 0.06)";
-                  }}
-                >
-                  Schedule
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
