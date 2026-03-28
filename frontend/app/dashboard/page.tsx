@@ -121,7 +121,7 @@ function DashboardContent() {
         </aside>
 
         {/* Main */}
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-6">
           {error && (
             <div className="card p-4 mb-4 glow-urgent">
               <span

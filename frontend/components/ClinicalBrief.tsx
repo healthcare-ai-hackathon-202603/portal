@@ -81,7 +81,7 @@ function formatDate(d: string) {
 function LabTrajectoryCard({ lab }: { lab: LabTrajectory }) {
   const sign = lab.change_percent >= 0 ? "+" : "";
   return (
-    <div className="card p-5">
+    <div className="card p-5 overflow-hidden">
       <div className="flex items-start justify-between mb-3">
         <div>
           <h4
@@ -120,7 +120,7 @@ function LabTrajectoryCard({ lab }: { lab: LabTrajectory }) {
         </span>
       </div>
 
-      <div style={{ height: 140 }}>
+      <div style={{ height: 160, width: "100%" }}>
         <TrendChart
           data={lab.values}
           title={lab.test_name}
@@ -136,7 +136,7 @@ function LabTrajectoryCard({ lab }: { lab: LabTrajectory }) {
 
 function VitalTrajectoryCard({ vital }: { vital: VitalTrajectory }) {
   return (
-    <div className="card p-5">
+    <div className="card p-5 overflow-hidden">
       <div className="flex items-start justify-between mb-3">
         <div>
           <h4
@@ -170,7 +170,7 @@ function VitalTrajectoryCard({ vital }: { vital: VitalTrajectory }) {
         </span>
       </div>
 
-      <div style={{ height: 120 }}>
+      <div style={{ height: 140, width: "100%" }}>
         <TrendChart
           data={vital.values}
           title={vital.vital_name}
@@ -347,7 +347,7 @@ function EncounterRow({ enc }: { enc: Encounter }) {
       className="border-0"
       style={{ borderBottom: "1px solid var(--border-subtle)" }}
     >
-      <td className="py-2.5 pr-3">
+      <td className="py-2.5 px-3 whitespace-nowrap">
         <span
           className="text-sm font-mono"
           style={{ color: "var(--text-secondary)" }}
@@ -355,7 +355,7 @@ function EncounterRow({ enc }: { enc: Encounter }) {
           {formatDate(enc.encounter_date)}
         </span>
       </td>
-      <td className="py-2.5 pr-3">
+      <td className="py-2.5 px-3 whitespace-nowrap">
         <div className="flex items-center gap-1.5">
           <span className="facility-dot" style={{ backgroundColor: color }} />
           <span className="text-sm" style={{ color }}>
@@ -363,7 +363,7 @@ function EncounterRow({ enc }: { enc: Encounter }) {
           </span>
         </div>
       </td>
-      <td className="py-2.5 pr-3">
+      <td className="py-2.5 px-3 whitespace-nowrap">
         <span
           className="text-xs uppercase tracking-wide"
           style={{ color: "var(--text-muted)" }}
@@ -371,7 +371,7 @@ function EncounterRow({ enc }: { enc: Encounter }) {
           {enc.encounter_type}
         </span>
       </td>
-      <td className="py-2.5 pr-3">
+      <td className="py-2.5 px-3">
         <span
           className="text-sm"
           style={{ color: "var(--text-secondary)" }}
@@ -379,23 +379,23 @@ function EncounterRow({ enc }: { enc: Encounter }) {
           {enc.chief_complaint}
         </span>
       </td>
-      <td className="py-2.5 pr-3">
-        <div>
+      <td className="py-2.5 px-3">
+        <div className="flex items-baseline gap-1.5 flex-wrap">
           <span
-            className="font-mono text-xs"
+            className="font-mono text-xs whitespace-nowrap"
             style={{ color: "var(--text-muted)" }}
           >
             {enc.diagnosis_code}
           </span>
           <span
-            className="text-sm ml-2"
+            className="text-sm"
             style={{ color: "var(--text-secondary)" }}
           >
             {enc.diagnosis_description}
           </span>
         </div>
       </td>
-      <td className="py-2.5">
+      <td className="py-2.5 px-3 whitespace-nowrap">
         <span
           className="text-xs"
           style={{ color: "var(--text-muted)" }}
@@ -440,7 +440,7 @@ export default function ClinicalBrief({ brief }: ClinicalBriefProps) {
     medication_alerts.cross_facility.length > 0;
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-8 animate-fade-in max-w-[1200px]">
       {/* Patient Header */}
       <div className="card-elevated p-6">
         <div className="flex items-center justify-between">
@@ -601,8 +601,8 @@ export default function ClinicalBrief({ brief }: ClinicalBriefProps) {
             title="Recent Encounters"
             count={last10Encounters.length}
           />
-          <div className="card-elevated overflow-x-auto">
-            <table className="w-full text-left" style={{ borderCollapse: "collapse" }}>
+          <div className="card-elevated overflow-x-auto rounded-2xl">
+            <table className="w-full text-left min-w-[700px]" style={{ borderCollapse: "collapse" }}>
               <thead>
                 <tr
                   style={{
@@ -613,7 +613,7 @@ export default function ClinicalBrief({ brief }: ClinicalBriefProps) {
                     (h) => (
                       <th
                         key={h}
-                        className="py-3 px-3 text-[11px] font-semibold uppercase tracking-widest"
+                        className="py-3 px-3 text-[11px] font-semibold uppercase tracking-widest whitespace-nowrap"
                         style={{ color: "var(--text-muted)" }}
                       >
                         {h}

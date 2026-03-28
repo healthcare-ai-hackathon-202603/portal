@@ -22,13 +22,6 @@ interface TrendChartProps {
   normalRange?: string;
 }
 
-const trendColors: Record<string, string> = {
-  improving: "var(--color-improving)",
-  stable: "var(--color-stable)",
-  worsening: "var(--color-worsening)",
-  spiking: "var(--color-spiking)",
-};
-
 const trendColorHex: Record<string, string> = {
   improving: "#34D399",
   stable: "#60A5FA",
@@ -113,80 +106,56 @@ export default function TrendChart({
   const padding = (maxVal - minVal) * 0.15 || 1;
 
   return (
-    <div className="card p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h4 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-            {title}
-          </h4>
-          {normalRange && (
-            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-              Normal: {normalRange}
-            </p>
-          )}
-        </div>
-        <span
-          className={`text-xs font-semibold px-2.5 py-1 rounded-full`}
-          style={{
-            color: trendColors[trend] || "var(--text-secondary)",
-            background: `${trendColorHex[trend] || "#60A5FA"}18`,
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 10 }}>
+        {referenceRangeLow !== undefined && referenceRangeHigh !== undefined && (
+          <ReferenceArea
+            y1={referenceRangeLow}
+            y2={referenceRangeHigh}
+            fill="rgba(52, 211, 153, 0.06)"
+            stroke="rgba(52, 211, 153, 0.15)"
+            strokeDasharray="4 4"
+          />
+        )}
+        <XAxis
+          dataKey="timestamp"
+          type="number"
+          domain={["dataMin", "dataMax"]}
+          tickFormatter={(ts: number) => {
+            const d = new Date(ts);
+            return d.toLocaleDateString("en-CA", { month: "short", year: "2-digit" });
           }}
-        >
-          {trend}
-        </span>
-      </div>
-
-      <ResponsiveContainer width="100%" height={180}>
-        <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 10 }}>
-          {referenceRangeLow !== undefined && referenceRangeHigh !== undefined && (
-            <ReferenceArea
-              y1={referenceRangeLow}
-              y2={referenceRangeHigh}
-              fill="rgba(52, 211, 153, 0.06)"
-              stroke="rgba(52, 211, 153, 0.15)"
-              strokeDasharray="4 4"
-            />
-          )}
-          <XAxis
-            dataKey="timestamp"
-            type="number"
-            domain={["dataMin", "dataMax"]}
-            tickFormatter={(ts: number) => {
-              const d = new Date(ts);
-              return d.toLocaleDateString("en-CA", { month: "short", year: "2-digit" });
-            }}
-            tick={{ fill: "#5A6677", fontSize: 10 }}
-            axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
-            tickLine={false}
-          />
-          <YAxis
-            domain={[minVal - padding, maxVal + padding]}
-            tick={{ fill: "#5A6677", fontSize: 10 }}
-            axisLine={false}
-            tickLine={false}
-            width={40}
-          />
-          <Tooltip content={<CustomTooltip unit={unit} />} />
-          <Line
-            type="monotone"
-            dataKey="value"
-            stroke={lineColor}
-            strokeWidth={2}
-            dot={{
-              r: 4,
-              fill: lineColor,
-              stroke: "var(--bg-secondary)",
-              strokeWidth: 2,
-            }}
-            activeDot={{
-              r: 6,
-              fill: lineColor,
-              stroke: "#fff",
-              strokeWidth: 2,
-            }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+          tick={{ fill: "#5A6677", fontSize: 10 }}
+          axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
+          tickLine={false}
+        />
+        <YAxis
+          domain={[minVal - padding, maxVal + padding]}
+          tick={{ fill: "#5A6677", fontSize: 10 }}
+          axisLine={false}
+          tickLine={false}
+          width={40}
+        />
+        <Tooltip content={<CustomTooltip unit={unit} />} />
+        <Line
+          type="monotone"
+          dataKey="value"
+          stroke={lineColor}
+          strokeWidth={2}
+          dot={{
+            r: 4,
+            fill: lineColor,
+            stroke: "var(--bg-secondary)",
+            strokeWidth: 2,
+          }}
+          activeDot={{
+            r: 6,
+            fill: lineColor,
+            stroke: "#fff",
+            strokeWidth: 2,
+          }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
   );
 }
