@@ -77,6 +77,16 @@ export default function TrendChart({
 }: TrendChartProps) {
   if (!data || data.length === 0) return null;
 
+  if (data.length === 1) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Single data point: {data[0].value} {unit}
+        </span>
+      </div>
+    );
+  }
+
   const lineColor = trendColorHex[trend] || "#60A5FA";
 
   const chartData: ChartDataPoint[] = data
