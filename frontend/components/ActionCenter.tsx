@@ -32,7 +32,7 @@ function deriveActionItems(
         context: alert.description,
         cta: "Schedule test",
       });
-    } else if (alert.category === "follow_up" && alert.severity !== "info") {
+    } else if (alert.category === "follow_up") {
       items.push({
         id: `follow_up_${alert.title}`,
         type: "follow_up",
