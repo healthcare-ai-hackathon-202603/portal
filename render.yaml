@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: healthsync-api
+    runtime: docker
+    plan: free
+    envVars:
+      - key: CLAUDE_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
